@@ -1,0 +1,19 @@
+# Scan results (lab data - keep local)
+scans/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets / local config
+.env
+.env.*
+*.key
+*.pem
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/

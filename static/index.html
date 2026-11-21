@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lab Port Scanner</title>
+<style>
+  :root {
+    --bg: #0b0f17; --panel: #111827; --panel-2: #0b1220; --border: #1f2937;
+    --text: #e2e8f0; --muted: #94a3b8; --dim: #64748b;
+    --accent: #10b981; --accent-2: #34d399; --warn: #fbbf24; --err: #f87171;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 16px; }
+  header h1 { margin: 0; font-size: 22px; display: flex; align-items: center; gap: 8px; }
+  header h1 .dot { color: var(--accent); }
+  header p { margin: 4px 0 24px; color: var(--muted); font-size: 13px; }
+
+  .grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: color-mix(in srgb, var(--panel) 70%, transparent);
+          border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card h2 { margin: 0 0 14px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #cbd5e1; }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .target { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+            padding: 10px 12px; font-family: var(--mono); font-size: 15px; color: #fff; }
+  .lock { font-family: inherit; font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+          color: var(--accent-2); border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+          border-radius: 999px; padding: 2px 8px; }
+  .kv { margin: 16px 0; font-size: 12px; color: var(--muted); display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+  .kv b { color: var(--text); font-weight: 500; font-family: var(--mono); }
+
+  button { font: inherit; cursor: pointer; }
+  .btn { width: 100%; background: #059669; color: #fff; border: 0; border-radius: 8px;
+         padding: 11px; font-weight: 600; transition: background .15s; }
+  .btn:hover { background: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-ghost { background: #1e293b; border: 1px solid #334155; color: var(--text); border-radius: 6px;
+               padding: 5px 10px; font-size: 12px; }
+  .btn-ghost:hover { background: #273449; }
+  .note { font-size: 11px; color: var(--dim); margin-top: 10px; }
+  .error { color: var(--err); font-size: 12px; margin-top: 10px; }
+
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .head h2 { margin: 0; }
+  .pill { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  .pill.running { background: rgba(251,191,36,.15); color: var(--warn); animation: pulse 1.4s infinite; }
+  .pill.done { background: rgba(16,185,129,.15); color: var(--accent-2); }
+  .pill.failed { background: rgba(248,113,113,.15); color: var(--err); }
+  @keyframes pulse { 50% { opacity: .5; } }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  @media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .stat span { display: block; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; }
+  .stat b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .stat b.green { color: var(--accent-2); }
+
+  .cmd { font-family: var(--mono); font-size: 11.5px; color: var(--muted); background: var(--panel-2);
+         border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 16px;
+         overflow-x: auto; white-space: nowrap; }
+
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim);
+       font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td.port { font-family: var(--mono); color: #fff; white-space: nowrap; }
+  td.port small { color: var(--dim); }
+  .svc { font-family: var(--mono); color: var(--accent-2); }
+  .ver { color: var(--text); }
+  .banner { font-family: var(--mono); font-size: 11.5px; color: var(--dim); margin-top: 2px; word-break: break-all; }
+  .hint { font-size: 12px; color: var(--muted); }
+
+  .empty { text-align: center; color: var(--dim); padding: 70px 10px; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent);
+             border-radius: 50%; margin: 0 auto 12px; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="dot">◉</span> Lab Port Scanner</h1>
+    <p>Light TCP scan of the approved lab host only. The target is fixed on the server and can't be changed from this page.</p>
+  </header>
+
+  <div class="grid">
+    <!-- Control panel -->
+    <section class="card" style="height: fit-content">
+      <h2>Scan</h2>
+      <label>Approved lab target</label>
+      <div class="target"><span id="target">loading…</span><span class="lock">🔒 locked</span></div>
+
+      <div class="kv">
+        <span>Scan type</span><b>TCP connect</b>
+        <span>Ports</span><b id="port-count">–</b>
+        <span>Engine</span><b id="engine">–</b>
+        <span>Profile</span><b>light / safe</b>
+      </div>
+
+      <button id="run" class="btn" disabled>Run Scan</button>
+      <p id="err" class="error hidden"></p>
+      <p class="note">No OS detection, no scripts, no aggressive timing. One scan at a time.</p>
+    </section>
+
+    <!-- Results -->
+    <section class="card">
+      <div class="head">
+        <h2>Results</h2>
+        <div style="display:flex; gap:8px; align-items:center">
+          <span id="pill" class="pill hidden"></span>
+          <button id="dl" class="btn-ghost hidden">↓ JSON</button>
+        </div>
+      </div>
+
+      <div id="empty" class="empty">Run a scan to see open ports and services here.</div>
+      <div id="loading" class="empty hidden"><div class="spinner"></div>Scanning <span id="loading-target"></span>…<br><small>Usually 5–60 seconds.</small></div>
+
+      <div id="results" class="hidden">
+        <div class="stats">
+          <div class="stat"><span>Open ports</span><b id="s-open" class="green">0</b></div>
+          <div class="stat"><span>Scanned</span><b id="s-scanned">0</b></div>
+          <div class="stat"><span>Duration</span><b id="s-dur">0s</b></div>
+          <div class="stat"><span>Host</span><b id="s-host">–</b></div>
+        </div>
+        <div class="cmd" id="cmd"></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Port</th><th>Service</th><th>Product / version</th><th>Notes</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <p class="note" id="saved"></p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let last = null;
+
+  function setPill(kind, text) {
+    const p = $("pill");
+    p.className = "pill " + kind;
+    p.textContent = text;
+  }
+  function show(id) { ["empty", "loading", "results"].forEach((x) => $(x).classList.toggle("hidden", x !== id)); }
+
+  async function loadConfig() {
+    try {
+      const cfg = await fetch("/api/config").then((r) => r.json());
+      $("target").textContent = cfg.target;
+      $("loading-target").textContent = cfg.target;
+      $("port-count").textContent = `${cfg.ports.length} top TCP`;
+      $("engine").textContent = cfg.engine;
+      $("run").disabled = cfg.busy;
+      if (cfg.busy) setPill("running", "scan in progress");
+    } catch (e) {
+      $("err").textContent = "Can't reach the scanner backend: " + e.message;
+      $("err").classList.remove("hidden");
+    }
+  }
+
+  async function runScan() {
+    $("run").disabled = true;
+    $("run").textContent = "Scanning…";
+    $("err").classList.add("hidden");
+    $("dl").classList.add("hidden");
+    setPill("running", "running");
+    show("loading");
+    try {
+      // No target in the body on purpose: the server always scans its approved host.
+      const r = await fetch("/api/scan", { method: "POST" });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      render(data);
+      setPill("done", "completed");
+    } catch (e) {
+      setPill("failed", "failed");
+      $("err").textContent = e.message;
+      $("err").classList.remove("hidden");
+      show(last ? "results" : "empty");
+    } finally {
+      $("run").disabled = false;
+      $("run").textContent = "Run Scan";
+    }
+  }
+
+  function render(d) {
+    last = d;
+    $("s-open").textContent = d.open_ports.length;
+    $("s-scanned").textContent = d.ports_scanned;
+    $("s-dur").textContent = d.duration_s + "s";
+    $("s-host").textContent = d.host_state;
+    $("cmd").textContent = "$ " + d.command;
+    $("saved").textContent = `Finished ${new Date(d.finished_at).toLocaleString()} · saved to ${d.saved_as}`;
+
+    $("rows").innerHTML = d.open_ports.length
+      ? d.open_ports.map((p) => `
+          <tr>
+            <td class="port">${p.port}<small>/${esc(p.protocol)}</small></td>
+            <td class="svc">${esc(p.service)}</td>
+            <td><div class="ver">${esc([p.product, p.version].filter(Boolean).join(" ")) || '<span class="hint">–</span>'}</div>
+                ${p.banner ? `<div class="banner">${esc(p.banner)}</div>` : ""}</td>
+            <td class="hint">${esc(p.note)}</td>
+          </tr>`).join("")
+      : `<tr><td colspan="4" class="hint" style="text-align:center; padding:30px">
+           No open ports found in the scanned range. Check that the lab VM is powered on and reachable.</td></tr>`;
+
+    $("dl").classList.remove("hidden");
+    show("results");
+  }
+
+  $("dl").addEventListener("click", () => {
+    if (!last) return;
+    const blob = new Blob([JSON.stringify(last, null, 2)], { type: "application/json" });
+    const a = Object.assign(document.createElement("a"), {
+      href: URL.createObjectURL(blob),
+      download: `scan_${last.target}_${last.started_at.replace(/[:]/g, "")}.json`,
+    });
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $("run").addEventListener("click", runScan);
+  loadConfig();
+})();
+</script>
+</body>
+</html>
